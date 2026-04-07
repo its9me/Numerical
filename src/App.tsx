@@ -384,15 +384,39 @@ const ProbabilityTool = () => {
 
 const VennDiagramTool = () => {
   const [activeRegion, setActiveRegion] = useState<string | null>(null);
+  const [rangeMax, setRangeMax] = useState(15);
+  const [ruleA, setRuleA] = useState(2);
+  const [ruleB, setRuleB] = useState(3);
+
+  const universalSet = useMemo(() => Array.from({ length: rangeMax }, (_, i) => i + 1), [rangeMax]);
+  const setA = useMemo(() => universalSet.filter(x => x % ruleA === 0), [universalSet, ruleA]);
+  const setB = useMemo(() => universalSet.filter(x => x % ruleB === 0), [universalSet, ruleB]);
 
   const regions = [
-    { id: 'A', label: 'A', color: 'bg-blue-500', fill: '#3b82f6', notation: 'A' },
-    { id: 'B', label: 'B', color: 'bg-rose-500', fill: '#f43f5e', notation: 'B' },
-    { id: 'intersection', label: 'A ∩ B', color: 'bg-purple-500', fill: '#a855f7', notation: 'A ∩ B' },
-    { id: 'union', label: 'A ∪ B', color: 'bg-indigo-500', fill: '#6366f1', notation: 'A ∪ B' },
-    { id: 'complementA', label: "A'", color: 'bg-slate-400', fill: '#94a3b8', notation: "A'" },
-    { id: 'complementB', label: "B'", color: 'bg-slate-400', fill: '#94a3b8', notation: "B'" },
+    { id: 'A', label: 'A', labelAr: 'المجموعة A', color: 'bg-blue-500', fill: '#3b82f6', notation: 'A', nameAr: 'المجموعة A' },
+    { id: 'B', label: 'B', labelAr: 'المجموعة B', color: 'bg-rose-500', fill: '#f43f5e', notation: 'B', nameAr: 'المجموعة B' },
+    { id: 'intersection', label: 'A ∩ B', labelAr: 'التقاطع', color: 'bg-purple-500', fill: '#a855f7', notation: 'A ∩ B', nameAr: 'تقاطع المجموعتين' },
+    { id: 'union', label: 'A ∪ B', labelAr: 'الاتحاد', color: 'bg-indigo-500', fill: '#6366f1', notation: 'A ∪ B', nameAr: 'اتحاد المجموعتين' },
+    { id: 'complementA', label: "A'", labelAr: 'متممة A', color: 'bg-slate-500', fill: '#64748b', notation: "A'", nameAr: 'متممة المجموعة A' },
+    { id: 'complementB', label: "B'", labelAr: 'متممة B', color: 'bg-slate-500', fill: '#64748b', notation: "B'", nameAr: 'متممة المجموعة B' },
+    { id: 'outside', label: 'S', labelAr: 'الفضاء', color: 'bg-slate-400', fill: '#94a3b8', notation: 'S', nameAr: 'فضاء العينة (خارج المجموعات)' },
   ];
+
+  const getResultingSet = (regionId: string | null) => {
+    if (!regionId) return [];
+    switch (regionId) {
+      case 'A': return setA;
+      case 'B': return setB;
+      case 'intersection': return setA.filter(x => setB.includes(x));
+      case 'union': return Array.from(new Set([...setA, ...setB])).sort((a, b) => a - b);
+      case 'complementA': return universalSet.filter(x => !setA.includes(x));
+      case 'complementB': return universalSet.filter(x => !setB.includes(x));
+      case 'outside': return universalSet.filter(x => !setA.includes(x) && !setB.includes(x));
+      default: return [];
+    }
+  };
+
+  const resultingSet = getResultingSet(activeRegion);
 
   const isHighlighted = (part: 'onlyA' | 'onlyB' | 'mid' | 'outside') => {
     if (!activeRegion) return false;
@@ -403,12 +427,13 @@ const VennDiagramTool = () => {
       case 'union': return part === 'onlyA' || part === 'onlyB' || part === 'mid';
       case 'complementA': return part === 'onlyB' || part === 'outside';
       case 'complementB': return part === 'onlyA' || part === 'outside';
+      case 'outside': return part === 'outside';
       default: return false;
     }
   };
 
   const getFillColor = (part: 'onlyA' | 'onlyB' | 'mid' | 'outside') => {
-    if (!isHighlighted(part)) return part === 'outside' ? 'white' : 'transparent';
+    if (!isHighlighted(part)) return 'transparent';
     return regions.find(r => r.id === activeRegion)?.fill || '#cbd5e1';
   };
 
@@ -419,37 +444,77 @@ const VennDiagramTool = () => {
           <Circle className="w-6 h-6" />
         </div>
         <div>
-          <h3 className="text-xl font-bold text-slate-900">Venn Playground</h3>
-          <p className="text-xs text-slate-500">مختبر مخطط فين التفاعلي</p>
+          <h3 className="text-xl font-bold text-slate-900">Set Operations Lab</h3>
+          <p className="text-xs text-slate-500">مختبر العمليات على المجموعات</p>
+        </div>
+      </div>
+
+      {/* Configuration Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold text-slate-400 uppercase">Universal Set S (1 to {rangeMax})</label>
+          <input 
+            type="range" min="5" max="50" value={rangeMax} 
+            onChange={(e) => setRangeMax(Number(e.target.value))} 
+            className="w-full accent-slate-600" 
+          />
+          <p className="text-[10px] text-slate-400">فضاء العينة من 1 إلى {rangeMax}</p>
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold text-blue-400 uppercase">Set A: Divisible by {ruleA}</label>
+          <input 
+            type="number" min="1" max="10" value={ruleA} 
+            onChange={(e) => setRuleA(Number(e.target.value))} 
+            className="w-full px-3 py-1 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" 
+          />
+          <p className="text-[10px] text-slate-400">الأرقام التي تقبل القسمة على {ruleA}</p>
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold text-rose-400 uppercase">Set B: Divisible by {ruleB}</label>
+          <input 
+            type="number" min="1" max="10" value={ruleB} 
+            onChange={(e) => setRuleB(Number(e.target.value))} 
+            className="w-full px-3 py-1 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-rose-500" 
+          />
+          <p className="text-[10px] text-slate-400">الأرقام التي تقبل القسمة على {ruleB}</p>
         </div>
       </div>
 
       <div className="relative aspect-video bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center overflow-hidden group">
-        <svg width="320" height="220" viewBox="0 0 320 220" className="drop-shadow-md">
+        <svg width="320" height="220" viewBox="0 0 320 220" className="drop-shadow-sm">
+          {/* Universal Set S (Background) */}
           <rect 
-            x="10" y="10" width="300" height="200" rx="12" 
-            fill={getFillColor('outside')} 
-            stroke="#e2e8f0" strokeWidth="2"
+            x="0" y="0" width="320" height="220" rx="12" 
+            fill="white"
+            stroke="#e2e8f0" strokeWidth="1"
+          />
+
+          {/* Outside Region (S \ (A U B)) */}
+          <path 
+            d="M 0,0 H 320 V 220 H 0 Z M 130,50 a 60,60 0 1,0 0,120 a 60,60 0 1,0 0,-120 M 190,50 a 60,60 0 1,1 0,120 a 60,60 0 1,1 0,-120"
+            fillRule="evenodd"
+            fill={getFillColor('outside')}
             className="transition-colors duration-300 cursor-pointer"
             onClick={() => setActiveRegion(activeRegion === 'outside' ? null : 'outside')}
           />
           
+          {/* Only A (Left Crescent) */}
           <path 
             d="M 160,58.04 A 60,60 0 1,0 160,161.96 A 60,60 0 0,1 160,58.04"
-            transform="translate(-30, 0)"
             fill={getFillColor('onlyA')}
             className="transition-colors duration-300 cursor-pointer hover:opacity-80"
             onClick={() => setActiveRegion('A')}
           />
 
+          {/* Only B (Right Crescent) */}
           <path 
-            d="M 160,58.04 A 60,60 0 0,1 160,161.96 A 60,60 0 1,1 160,58.04"
-            transform="translate(30, 0)"
+            d="M 160,58.04 A 60,60 0 1,1 160,161.96 A 60,60 0 0,0 160,58.04"
             fill={getFillColor('onlyB')}
             className="transition-colors duration-300 cursor-pointer hover:opacity-80"
             onClick={() => setActiveRegion('B')}
           />
 
+          {/* Intersection (Middle Lens) */}
           <path 
             d="M 160,58.04 A 60,60 0 0,1 160,161.96 A 60,60 0 0,1 160,58.04"
             fill={getFillColor('mid')}
@@ -457,12 +522,13 @@ const VennDiagramTool = () => {
             onClick={() => setActiveRegion('intersection')}
           />
 
+          {/* Outlines */}
           <circle cx="130" cy="110" r="60" fill="none" stroke="#3b82f6" strokeWidth="2" pointerEvents="none" />
           <circle cx="190" cy="110" r="60" fill="none" stroke="#f43f5e" strokeWidth="2" pointerEvents="none" />
 
           <text x="90" y="70" className="text-sm font-black fill-blue-600 pointer-events-none">A</text>
           <text x="230" y="70" className="text-sm font-black fill-rose-600 pointer-events-none">B</text>
-          <text x="25" y="35" className="text-[10px] font-bold fill-slate-400 pointer-events-none">S</text>
+          <text x="15" y="25" className="text-[10px] font-bold fill-slate-400 pointer-events-none">S</text>
         </svg>
 
         {activeRegion && (
@@ -471,11 +537,22 @@ const VennDiagramTool = () => {
             animate={{ y: 0, opacity: 1 }}
             className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md p-3 rounded-2xl border border-slate-200 flex justify-between items-center shadow-xl"
           >
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Set Notation</span>
-              <span className="text-xl font-serif font-black text-indigo-600">
-                {regions.find(r => r.id === activeRegion)?.notation || 'S'}
+            <div className="flex flex-col max-w-[70%]">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                {regions.find(r => r.id === activeRegion)?.nameAr || 'العملية'}
               </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-serif font-black text-indigo-600">
+                  {regions.find(r => r.id === activeRegion)?.notation || 'S'}
+                </span>
+                <span className="text-xs font-bold text-slate-400">({resultingSet.length} elements)</span>
+              </div>
+              <div className="flex flex-wrap gap-1 mt-1 max-h-12 overflow-y-auto">
+                {resultingSet.map(num => (
+                  <span key={num} className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-bold text-slate-600">{num}</span>
+                ))}
+                {resultingSet.length === 0 && <span className="text-[10px] text-slate-300 italic">Empty Set | مجموعة خالية</span>}
+              </div>
             </div>
             <button 
               onClick={() => setActiveRegion(null)}
@@ -487,18 +564,19 @@ const VennDiagramTool = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {regions.map((region) => (
           <button
             key={region.id}
             onClick={() => setActiveRegion(activeRegion === region.id ? null : region.id)}
-            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all border ${
+            className={`py-2 px-1 rounded-xl text-[10px] font-bold transition-all border flex flex-col items-center justify-center gap-0.5 ${
               activeRegion === region.id 
                 ? `${region.color} text-white border-transparent shadow-lg scale-105 ring-4 ring-indigo-100` 
                 : 'bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100'
             }`}
           >
-            {region.label}
+            <span>{region.label}</span>
+            <span className="text-[8px] opacity-70 font-normal">{region.labelAr}</span>
           </button>
         ))}
       </div>
@@ -886,6 +964,177 @@ const ErrorImpactVisualizer = () => {
   );
 };
 
+const PrecisionAccuracyLab = () => {
+  const [accuracy, setAccuracy] = useState(80); // 0 to 100
+  const [precision, setPrecision] = useState(80); // 0 to 100
+  
+  const points = useMemo(() => {
+    const pts = [];
+    const centerX = 100;
+    const centerY = 100;
+    
+    // Accuracy offset (how far the cluster is from center)
+    const offsetX = (100 - accuracy) * 0.6;
+    const offsetY = (100 - accuracy) * 0.3;
+    
+    // Precision spread (how spread out the points are)
+    const spread = (100 - precision) * 0.5;
+    
+    for (let i = 0; i < 12; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * spread;
+      pts.push({
+        x: centerX + offsetX + Math.cos(angle) * dist,
+        y: centerY + offsetY + Math.sin(angle) * dist
+      });
+    }
+    return pts;
+  }, [accuracy, precision]);
+
+  return (
+    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6 mt-6">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center text-rose-600">
+          <Activity className="w-6 h-6" />
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-slate-900">Precision vs Accuracy</h3>
+          <p className="text-xs text-slate-500">الدقة مقابل الضبط</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-6 items-center">
+        <div className="relative w-48 h-48 bg-slate-100 rounded-full border-4 border-slate-200 flex items-center justify-center overflow-hidden">
+          {/* Target Rings */}
+          <div className="absolute w-40 h-40 border-2 border-slate-200 rounded-full" />
+          <div className="absolute w-28 h-28 border-2 border-slate-200 rounded-full" />
+          <div className="absolute w-16 h-16 border-2 border-slate-200 rounded-full" />
+          <div className="absolute w-4 h-4 bg-blue-500 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
+          
+          {/* Points */}
+          <svg width="200" height="200" viewBox="0 0 200 200" className="absolute inset-0">
+            {points.map((p, i) => (
+              <motion.circle 
+                key={i}
+                initial={{ opacity: 0 }}
+                animate={{ x: p.x, y: p.y, opacity: 1 }}
+                r="3"
+                fill="#f43f5e"
+                className="drop-shadow-sm"
+              />
+            ))}
+          </svg>
+        </div>
+
+        <div className="flex-1 space-y-4 w-full">
+          <div className="space-y-1">
+            <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
+              <span>Accuracy (الضبط)</span>
+              <span>{accuracy}%</span>
+            </div>
+            <input type="range" value={accuracy} onChange={(e) => setAccuracy(Number(e.target.value))} className="w-full accent-blue-600" />
+          </div>
+          <div className="space-y-1">
+            <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
+              <span>Precision (الدقة)</span>
+              <span>{precision}%</span>
+            </div>
+            <input type="range" value={precision} onChange={(e) => setPrecision(Number(e.target.value))} className="w-full accent-rose-600" />
+          </div>
+          
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[10px] text-slate-500 leading-relaxed">
+            <strong className="text-slate-700 block mb-1">Numerical Insight:</strong>
+            Accuracy is how close a measurement is to the true value. Precision is how consistent the measurements are.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AxiomVisualizer = () => {
+  const [pa, setPa] = useState(0.4);
+  const [pb, setPb] = useState(0.3);
+  const [pab, setPab] = useState(0.1);
+
+  // Ensure pab <= min(pa, pb)
+  const effectivePab = Math.min(pab, pa, pb);
+  const union = pa + pb - effectivePab;
+
+  return (
+    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6 mt-6">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
+          <ShieldCheck className="w-6 h-6" />
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-slate-900">Axiom Explorer</h3>
+          <p className="text-xs text-slate-500">مستكشف بديهيات الاحتمالية</p>
+        </div>
+      </div>
+
+      <div className="space-y-8">
+        {/* Probability Bar */}
+        <div className="relative h-12 bg-slate-100 rounded-2xl border border-slate-200 overflow-hidden flex items-center px-1">
+          <div className="absolute inset-0 flex justify-between px-4 pointer-events-none">
+            <span className="text-[10px] font-bold text-slate-300 self-center">0</span>
+            <span className="text-[10px] font-bold text-slate-300 self-center">0.5</span>
+            <span className="text-[10px] font-bold text-slate-300 self-center">1.0</span>
+          </div>
+          
+          {/* Event A */}
+          <motion.div 
+            animate={{ width: `${pa * 100}%` }}
+            className="absolute left-0 h-8 bg-blue-500/30 border-r-2 border-blue-500 z-10"
+          />
+          
+          {/* Event B (from right for visualization) */}
+          <motion.div 
+            animate={{ width: `${pb * 100}%` }}
+            className="absolute right-0 h-8 bg-rose-500/30 border-l-2 border-rose-500 z-10"
+          />
+
+          {/* Union Highlight */}
+          <motion.div 
+            animate={{ width: `${Math.min(100, union * 100)}%` }}
+            className="absolute left-0 h-1 bg-indigo-600 bottom-0 z-20"
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <label className="text-[9px] font-bold text-blue-500 uppercase">P(A)</label>
+            <input type="number" step="0.05" min="0" max="1" value={pa} onChange={(e) => setPa(Number(e.target.value))} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[9px] font-bold text-rose-500 uppercase">P(B)</label>
+            <input type="number" step="0.05" min="0" max="1" value={pb} onChange={(e) => setPb(Number(e.target.value))} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[9px] font-bold text-purple-500 uppercase">P(A ∩ B)</label>
+            <input type="number" step="0.05" min="0" max="1" value={pab} onChange={(e) => setPab(Number(e.target.value))} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs" />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+            <div className={`w-2 h-2 rounded-full ${pa >= 0 && pa <= 1 ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="text-[10px] font-medium text-slate-700">Axiom 1: 0 ≤ P(A) ≤ 1</span>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+            <div className={`w-2 h-2 rounded-full ${union <= 1 ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="text-[10px] font-medium text-slate-700">Axiom 2: P(S) = 1 (Union ≤ 1)</span>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100">
+            <div className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="text-[10px] font-medium text-slate-700">Axiom 3: P(A ∪ B) = {union.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
 export default function App() {
@@ -1263,6 +1512,7 @@ $A \cap B = \{6\} \implies P(A \cap B) = 1/6 \approx 0.16$
               {activeSection === 'lecture1' && (
                 <>
                   <NumericalLab />
+                  <PrecisionAccuracyLab />
                   <ErrorVisualizer />
                   <SqrtApproximation />
                   <RoundingChoppingTool />
@@ -1271,6 +1521,7 @@ $A \cap B = \{6\} \implies P(A \cap B) = 1/6 \approx 0.16$
               )}
               {activeSection === 'lecture3' && (
                 <>
+                  <AxiomVisualizer />
                   <ProbabilityTool />
                   <VennDiagramTool />
                   <DieSimulator />
